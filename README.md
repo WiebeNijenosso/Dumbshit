@@ -5,6 +5,7 @@ Nina en ik heb hier super hard aan gewerkt(lmao nee) dus ik hoop dat jullie het 
 
 ## Instalatie
 Download het bestand lol
+Waarschijnlijk gaan Google EN Windows zeggen dat het een virus is, maar je moet me hier op vertrouwen dat het virus is. Het is letterlijk een executable gemaakt door mij en opent letterlijk alleen een foto van nick met een sigaretten panfluit
 
 ## hoe werkt het
 ```Cs
