@@ -4,7 +4,9 @@ Hier heb je een programma speciaal gemaakt om jullie uit te schelden
 Nina en ik heb hier super hard aan gewerkt(lmao nee) dus ik hoop dat jullie het leuk vinden lol
 
 ## Instalatie
-Download het bestand lol
+DOWNLOAD ALLEEN HET Nick.....exe BESTAND. De rest is voor als je door alle code wilt kijken(Dion vind dat miss interresant)
+
+
 Waarschijnlijk gaan Google EN Windows zeggen dat het een virus is, maar je moet me hier op vertrouwen dat het virus is. Het is letterlijk een executable gemaakt door mij en opent letterlijk alleen een foto van nick met een sigaretten panfluit
 
 ## hoe werkt het
