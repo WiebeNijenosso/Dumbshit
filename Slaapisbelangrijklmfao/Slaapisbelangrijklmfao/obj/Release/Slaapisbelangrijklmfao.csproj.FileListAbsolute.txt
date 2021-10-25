@@ -1,0 +1,11 @@
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\bin\Release\Slaapisbelangrijklmfao.exe.config
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\bin\Release\Slaapisbelangrijklmfao.exe
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\bin\Release\Slaapisbelangrijklmfao.pdb
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\obj\Release\Slaapisbelangrijklmfao.Form1.resources
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\obj\Release\Slaapisbelangrijklmfao.Properties.Resources.resources
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\obj\Release\Slaapisbelangrijklmfao.csproj.GenerateResource.cache
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\obj\Release\Slaapisbelangrijklmfao.csproj.CoreCompileInputs.cache
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\obj\Release\Slaapisbelangrijklmfao.exe
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\obj\Release\Slaapisbelangrijklmfao.pdb
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\obj\Release\Slaapisbelangrijklmfao.csproj.AssemblyReference.cache
+C:\Users\Wiebe Nijenhuis\source\repos\Slaapisbelangrijklmfao\Slaapisbelangrijklmfao\obj\Release\Slaapisbelangrijklmfao.Form2.resources
