@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Leerlingen</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">Lesrooster</div>
+      <nav>
+        <a href="index.html">Rooster</a>
+        <a href="leerlingen.html" class="active">Leerlingen</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Leerlingen</h1>
+
+    <section class="card">
+      <h2 id="form-title">Leerling toevoegen</h2>
+      <form id="student-form" class="inline">
+        <input type="hidden" name="id">
+        <label>Naam
+          <input name="name" required placeholder="Bijv. Sanne de Vries">
+        </label>
+        <label>Telefoonnummer
+          <input name="phone" type="tel" placeholder="06 12345678">
+        </label>
+        <label>Type
+          <select name="type">
+            <option value="weekly">Elke week</option>
+            <option value="biweekly">Elke twee weken</option>
+            <option value="package">Lespakket van x lessen</option>
+          </select>
+        </label>
+        <label id="package-field" hidden>Aantal lessen
+          <input name="packageSize" type="number" min="1" value="10">
+        </label>
+        <label>Presentie
+          <input name="presence" type="number" min="0" value="0">
+        </label>
+        <button type="submit" id="submit-btn">Toevoegen</button>
+        <button type="button" id="cancel-edit" class="secondary" hidden>Annuleren</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Overzicht</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Naam</th>
+              <th class="hide-sm">Telefoon</th>
+              <th>Type</th>
+              <th>Presentie</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="student-rows"></tbody>
+        </table>
+      </div>
+      <p id="no-students" class="empty" hidden>Nog geen leerlingen toegevoegd.</p>
+    </section>
+
+    <section class="card">
+      <h2>Back-up</h2>
+      <p class="sub">Gegevens worden in deze browser opgeslagen. Maak af en toe een back-up.</p>
+      <div class="toolbar">
+        <button type="button" id="export-btn" class="secondary">Back-up downloaden</button>
+        <button type="button" class="secondary" onclick="document.getElementById('import-input').click()">Back-up terugzetten</button>
+        <input type="file" id="import-input" accept="application/json" hidden>
+      </div>
+    </section>
+  </main>
+
+  <script src="store.js"></script>
+  <script>
+    const form = document.getElementById("student-form");
+    const packageField = document.getElementById("package-field");
+    const rows = document.getElementById("student-rows");
+    const noStudents = document.getElementById("no-students");
+    const submitBtn = document.getElementById("submit-btn");
+    const cancelBtn = document.getElementById("cancel-edit");
+    const formTitle = document.getElementById("form-title");
+
+    function togglePackageField() {
+      packageField.hidden = form.type.value !== "package";
+    }
+    form.type.addEventListener("change", togglePackageField);
+
+    function resetForm() {
+      form.reset();
+      form.id.value = "";
+      submitBtn.textContent = "Toevoegen";
+      formTitle.textContent = "Leerling toevoegen";
+      cancelBtn.hidden = true;
+      togglePackageField();
+    }
+    cancelBtn.addEventListener("click", resetForm);
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const data = loadData();
+      const student = {
+        id: form.id.value || uid(),
+        name: form.name.value.trim(),
+        phone: form.phone.value.trim(),
+        type: form.type.value,
+        packageSize: form.type.value === "package" ? Math.max(1, parseInt(form.packageSize.value, 10) || 1) : null,
+        presence: Math.max(0, parseInt(form.presence.value, 10) || 0),
+      };
+      if (!student.name) return;
+      const idx = data.students.findIndex((s) => s.id === student.id);
+      if (idx >= 0) data.students[idx] = student;
+      else data.students.push(student);
+      saveData(data);
+      resetForm();
+      render();
+    });
+
+    function setPresence(id, value) {
+      const data = loadData();
+      const s = data.students.find((x) => x.id === id);
+      if (!s) return;
+      s.presence = Math.max(0, value);
+      saveData(data);
+      render();
+    }
+
+    function editStudent(id) {
+      const s = loadData().students.find((x) => x.id === id);
+      if (!s) return;
+      form.id.value = s.id;
+      form.name.value = s.name;
+      form.phone.value = s.phone;
+      form.type.value = s.type;
+      form.packageSize.value = s.packageSize || 10;
+      form.presence.value = s.presence;
+      togglePackageField();
+      submitBtn.textContent = "Opslaan";
+      formTitle.textContent = "Leerling bewerken";
+      cancelBtn.hidden = false;
+      form.scrollIntoView({ behavior: "smooth", block: "center" });
+      form.name.focus();
+    }
+
+    function deleteStudent(id) {
+      const data = loadData();
+      const s = data.students.find((x) => x.id === id);
+      if (!s) return;
+      const count = data.lessons.filter((l) => l.studentId === id).length;
+      const extra = count ? `\nDe leerling staat ${count}x ingepland; die lessen worden ook verwijderd.` : "";
+      if (!confirm(`${s.name} verwijderen?${extra}`)) return;
+      data.students = data.students.filter((x) => x.id !== id);
+      data.lessons = data.lessons.filter((l) => l.studentId !== id);
+      saveData(data);
+      if (form.id.value === id) resetForm();
+      render();
+    }
+
+    function render() {
+      const data = loadData();
+      const students = [...data.students].sort((a, b) => a.name.localeCompare(b.name, "nl"));
+      noStudents.hidden = students.length > 0;
+      rows.innerHTML = students.map((s) => {
+        const planned = data.lessons.filter((l) => l.studentId === s.id).length;
+        const pkg = s.type === "package"
+          ? `<div class="sub">${Math.max(0, s.packageSize - s.presence)} van ${s.packageSize} over</div>` : "";
+        return `
+          <tr>
+            <td><strong>${escapeHtml(s.name)}</strong><div class="sub">${planned}x ingepland</div></td>
+            <td class="hide-sm">${s.phone ? `<a href="tel:${escapeHtml(s.phone.replace(/\s/g, ""))}">${escapeHtml(s.phone)}</a>` : "<span class='sub'>—</span>"}</td>
+            <td><span class="badge ${s.type}">${escapeHtml(typeLabel(s))}</span>${pkg}</td>
+            <td>
+              <div class="presence">
+                <button class="secondary icon" data-act="dec" data-id="${s.id}" aria-label="Presentie min 1">−</button>
+                <input type="number" min="0" value="${s.presence}" data-act="set" data-id="${s.id}" aria-label="Presentie">
+                <button class="secondary icon" data-act="inc" data-id="${s.id}" aria-label="Presentie plus 1">+</button>
+              </div>
+            </td>
+            <td>
+              <div class="actions">
+                <button class="secondary small" data-act="edit" data-id="${s.id}">Bewerken</button>
+                <button class="danger small" data-act="delete" data-id="${s.id}">Verwijderen</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join("");
+    }
+
+    rows.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-act]");
+      if (!btn) return;
+      const id = btn.dataset.id;
+      const s = loadData().students.find((x) => x.id === id);
+      switch (btn.dataset.act) {
+        case "inc": setPresence(id, s.presence + 1); break;
+        case "dec": setPresence(id, s.presence - 1); break;
+        case "edit": editStudent(id); break;
+        case "delete": deleteStudent(id); break;
+      }
+    });
+
+    rows.addEventListener("change", (e) => {
+      const input = e.target.closest("input[data-act='set']");
+      if (input) setPresence(input.dataset.id, parseInt(input.value, 10) || 0);
+    });
+
+    setupBackupButtons(render);
+    togglePackageField();
+    render();
+  </script>
+</body>
+</html>
