@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesrooster</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="brand">Lesrooster</div>
+      <nav>
+        <a href="index.html" class="active">Rooster</a>
+        <a href="leerlingen.html">Leerlingen</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <h1>Rooster</h1>
+
+    <section class="card">
+      <h2>Lesdag toevoegen</h2>
+      <form id="day-form" class="inline">
+        <label>Datum
+          <input name="date" type="date" required>
+        </label>
+        <label>Van
+          <input name="start" type="time" step="900" value="14:00" required>
+        </label>
+        <label>Tot
+          <input name="end" type="time" step="900" value="18:00" required>
+        </label>
+        <label style="flex-direction:row; align-items:center; gap:8px; color:var(--text)">
+          <input name="autofill" type="checkbox" checked>
+          Vaste leerlingen overnemen van vorige weken
+        </label>
+        <button type="submit">Lesdag toevoegen</button>
+      </form>
+      <p id="day-error" class="error"></p>
+    </section>
+
+    <section class="card">
+      <h2>Lesdagen</h2>
+      <div id="days" class="days"></div>
+      <p id="no-days" class="empty" hidden>Nog geen lesdagen. Voeg er hierboven een toe.</p>
+    </section>
+
+    <section class="card" id="schedule-card" hidden>
+      <h2 id="schedule-title"></h2>
+      <p class="sub" id="schedule-sub"></p>
+      <div id="grid" class="grid"></div>
+    </section>
+  </main>
+
+  <dialog id="lesson-dialog">
+    <form id="lesson-form" method="dialog">
+      <h2 id="dialog-title">Leerling inplannen</h2>
+      <label>Leerling
+        <select name="studentId" required></select>
+      </label>
+      <label>Starttijd
+        <select name="start"></select>
+      </label>
+      <label>Duur
+        <select name="duration"></select>
+      </label>
+      <p class="error" id="dialog-error"></p>
+      <div class="buttons">
+        <button type="button" class="danger left" id="delete-lesson" hidden>Uitplannen</button>
+        <button type="button" class="secondary" id="presence-btn" hidden>Aanwezig (+1)</button>
+        <button type="button" class="secondary" id="cancel-dialog">Annuleren</button>
+        <button type="submit" id="save-lesson">Opslaan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="store.js"></script>
+  <script>
+    const SLOT = 15;
+    const dayForm = document.getElementById("day-form");
+    const dayError = document.getElementById("day-error");
+    const daysEl = document.getElementById("days");
+    const noDays = document.getElementById("no-days");
+    const scheduleCard = document.getElementById("schedule-card");
+    const gridEl = document.getElementById("grid");
+    const dialog = document.getElementById("lesson-dialog");
+    const lessonForm = document.getElementById("lesson-form");
+    const dialogError = document.getElementById("dialog-error");
+    const deleteBtn = document.getElementById("delete-lesson");
+    const presenceBtn = document.getElementById("presence-btn");
+
+    let selectedDayId = location.hash.slice(1) || null;
+    let editing = null; // { dayId, lessonId|null }
+
+    // Standaard datum: vandaag
+    dayForm.date.value = todayIso();
+
+    function roundToQuarter(t) {
+      const m = timeToMin(t);
+      return minToTime(Math.round(m / SLOT) * SLOT);
+    }
+
+    function addDays(iso, n) {
+      const d = new Date(iso + "T00:00:00");
+      d.setDate(d.getDate() + n);
+      const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), dd = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${dd}`;
+    }
+
+    function sortedDays(data) {
+      return [...data.days].sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+    }
+
+    // Past [start, start+duration) binnen de dag en zonder overlap?
+    function fits(data, day, start, duration, ignoreLessonId) {
+      const s = timeToMin(start), e = s + duration;
+      if (s < timeToMin(day.start) || e > timeToMin(day.end)) return false;
+      return !data.lessons.some((l) => {
+        if (l.dayId !== day.id || l.id === ignoreLessonId) return false;
+        const ls = timeToMin(l.start), le = ls + l.duration;
+        return s < le && ls < e;
+      });
+    }
+
+    // Neem leerlingen over: 'elke week' en lespakketten van 7 dagen eerder, 'elke twee weken' van 14 dagen eerder.
+    function autofill(data, newDay) {
+      const byId = Object.fromEntries(data.students.map((s) => [s.id, s]));
+      const sources = [
+        { offset: -7, types: ["weekly", "package"] },
+        { offset: -14, types: ["biweekly"] },
+      ];
+      let added = 0;
+      for (const { offset, types } of sources) {
+        const date = addDays(newDay.date, offset);
+        const prevDays = data.days.filter((d) => d.date === date);
+        for (const pd of prevDays) {
+          for (const l of data.lessons.filter((x) => x.dayId === pd.id)) {
+            const st = byId[l.studentId];
+            if (!st || !types.includes(st.type)) continue;
+            if (st.type === "package" && st.presence >= st.packageSize) continue;
+            if (data.lessons.some((x) => x.dayId === newDay.id && x.studentId === st.id)) continue;
+            if (!fits(data, newDay, l.start, l.duration)) continue;
+            data.lessons.push({ id: uid(), dayId: newDay.id, studentId: st.id, start: l.start, duration: l.duration });
+            added++;
+          }
+        }
+      }
+      return added;
+    }
+
+    dayForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      dayError.textContent = "";
+      const start = roundToQuarter(dayForm.start.value);
+      const end = roundToQuarter(dayForm.end.value);
+      if (timeToMin(end) <= timeToMin(start)) {
+        dayError.textContent = "De eindtijd moet na de begintijd liggen.";
+        return;
+      }
+      const data = loadData();
+      const day = { id: uid(), date: dayForm.date.value, start, end };
+      const overlap = data.days.some((d) => d.date === day.date &&
+        timeToMin(day.start) < timeToMin(d.end) && timeToMin(d.start) < timeToMin(day.end));
+      if (overlap) {
+        dayError.textContent = "Er is al een lesdag op deze datum die overlapt met deze tijden.";
+        return;
+      }
+      data.days.push(day);
+      const added = dayForm.autofill.checked ? autofill(data, day) : 0;
+      saveData(data);
+      selectedDayId = day.id;
+      // Volgende week alvast voorinvullen
+      dayForm.date.value = addDays(day.date, 7);
+      if (added) dayError.textContent = "";
+      render();
+      if (added) flash(`${added} vaste ${added === 1 ? "leerling" : "leerlingen"} automatisch ingepland.`);
+    });
+
+    function flash(msg) {
+      const sub = document.getElementById("schedule-sub");
+      sub.textContent = msg;
+      setTimeout(() => render(), 3000);
+    }
+
+    function deleteDay(id) {
+      const data = loadData();
+      const day = data.days.find((d) => d.id === id);
+      if (!day) return;
+      const count = data.lessons.filter((l) => l.dayId === id).length;
+      const extra = count ? `\nEr ${count === 1 ? "staat 1 les" : `staan ${count} lessen`} ingepland die ook verwijderd ${count === 1 ? "wordt" : "worden"}.` : "";
+      if (!confirm(`Lesdag ${formatDate(day.date)} verwijderen?${extra}`)) return;
+      data.days = data.days.filter((d) => d.id !== id);
+      data.lessons = data.lessons.filter((l) => l.dayId !== id);
+      saveData(data);
+      if (selectedDayId === id) selectedDayId = null;
+      render();
+    }
+
+    daysEl.addEventListener("click", (e) => {
+      const rm = e.target.closest(".remove");
+      if (rm) { deleteDay(rm.dataset.id); return; }
+      const sel = e.target.closest(".select-day");
+      if (sel) { selectedDayId = sel.dataset.id; render(); }
+    });
+
+    function renderDays(data) {
+      const days = sortedDays(data);
+      noDays.hidden = days.length > 0;
+      if (!days.find((d) => d.id === selectedDayId)) {
+        const today = todayIso();
+        const upcoming = days.find((d) => d.date >= today);
+        selectedDayId = (upcoming || days[days.length - 1] || {}).id || null;
+      }
+      daysEl.innerHTML = days.map((d) => {
+        const n = data.lessons.filter((l) => l.dayId === d.id).length;
+        return `
+          <div class="day-chip ${d.id === selectedDayId ? "selected" : ""}">
+            <button class="select-day" data-id="${d.id}">${escapeHtml(formatDateShort(d.date))}
+              <small>${d.start}–${d.end} · ${n} les${n === 1 ? "" : "sen"}</small></button>
+            <button class="remove" data-id="${d.id}" title="Lesdag verwijderen" aria-label="Lesdag verwijderen">×</button>
+          </div>`;
+      }).join("");
+    }
+
+    function renderGrid(data) {
+      const day = data.days.find((d) => d.id === selectedDayId);
+      scheduleCard.hidden = !day;
+      if (!day) { history.replaceState(null, "", location.pathname); return; }
+      history.replaceState(null, "", "#" + day.id);
+
+      document.getElementById("schedule-title").textContent =
+        formatDate(day.date).replace(/^./, (c) => c.toUpperCase());
+      document.getElementById("schedule-sub").textContent =
+        `${day.start} – ${day.end} · klik op een kwartier om een leerling in te plannen`;
+
+      const byId = Object.fromEntries(data.students.map((s) => [s.id, s]));
+      const lessons = data.lessons.filter((l) => l.dayId === day.id);
+      const startMin = timeToMin(day.start), endMin = timeToMin(day.end);
+      let html = "";
+      for (let m = startMin; m < endMin; m += SLOT) {
+        const t = minToTime(m);
+        const starting = lessons.find((l) => timeToMin(l.start) === m);
+        const covering = lessons.find((l) => timeToMin(l.start) < m && m < timeToMin(l.start) + l.duration);
+        let cell;
+        if (starting) {
+          const s = byId[starting.studentId];
+          const end = minToTime(m + starting.duration);
+          const name = s ? escapeHtml(s.name) : "<em>Onbekende leerling</em>";
+          const extra = s && s.type === "package" ? ` · ${s.presence}/${s.packageSize}` : s ? ` · presentie ${s.presence}` : "";
+          cell = `<div class="slot"><div class="lesson ${s ? s.type : ""}" data-lesson="${starting.id}">
+            <span class="name">${name}</span>
+            <span class="meta">${starting.start}–${end}${extra}</span></div></div>`;
+        } else if (covering) {
+          const s = byId[covering.studentId];
+          cell = `<div class="slot continued"><div class="lesson ${s ? s.type : ""}"><span class="meta">↳ ${s ? escapeHtml(s.name) : ""}</span></div></div>`;
+        } else {
+          cell = `<div class="slot"><button class="free" data-time="${t}">+ inplannen</button></div>`;
+        }
+        html += `<div class="row ${m % 60 === 0 ? "hour" : ""}"><div class="time">${t}</div>${cell}</div>`;
+      }
+      gridEl.innerHTML = html;
+    }
+
+    gridEl.addEventListener("click", (e) => {
+      const free = e.target.closest(".free");
+      if (free) { openDialog(selectedDayId, null, free.dataset.time); return; }
+      const lesson = e.target.closest(".lesson[data-lesson]");
+      if (lesson) openDialog(selectedDayId, lesson.dataset.lesson);
+    });
+
+    // ---- Dialoog ----
+    function fillDurationOptions(data, day, start, current, ignoreId) {
+      const sel = lessonForm.duration;
+      const opts = [];
+      for (let d = SLOT; d <= 120; d += SLOT) {
+        if (fits(data, day, start, d, ignoreId)) opts.push(d);
+        else break;
+      }
+      sel.innerHTML = opts.map((d) => `<option value="${d}">${d} minuten</option>`).join("");
+      if (opts.includes(current)) sel.value = String(current);
+      else if (opts.includes(30)) sel.value = "30";
+      return opts.length > 0;
+    }
+
+    function fillStartOptions(data, day, current, ignoreId) {
+      const opts = [];
+      for (let m = timeToMin(day.start); m < timeToMin(day.end); m += SLOT) {
+        const t = minToTime(m);
+        if (fits(data, day, t, SLOT, ignoreId)) opts.push(t);
+      }
+      lessonForm.start.innerHTML = opts.map((t) => `<option>${t}</option>`).join("");
+      lessonForm.start.value = current;
+    }
+
+    function openDialog(dayId, lessonId, time) {
+      const data = loadData();
+      const day = data.days.find((d) => d.id === dayId);
+      if (!day) return;
+      if (!data.students.length) {
+        if (confirm("Je hebt nog geen leerlingen. Nu leerlingen toevoegen?")) location.href = "leerlingen.html";
+        return;
+      }
+      const lesson = lessonId ? data.lessons.find((l) => l.id === lessonId) : null;
+      editing = { dayId, lessonId };
+      dialogError.textContent = "";
+
+      const students = [...data.students].sort((a, b) => a.name.localeCompare(b.name, "nl"));
+      lessonForm.studentId.innerHTML = students.map((s) =>
+        `<option value="${s.id}">${escapeHtml(s.name)} — ${escapeHtml(typeLabel(s))}</option>`).join("");
+      if (lesson) lessonForm.studentId.value = lesson.studentId;
+
+      const start = lesson ? lesson.start : time;
+      fillStartOptions(data, day, start, lessonId);
+      fillDurationOptions(data, day, start, lesson ? lesson.duration : 30, lessonId);
+
+      document.getElementById("dialog-title").textContent = lesson ? "Les bewerken" : "Leerling inplannen";
+      deleteBtn.hidden = !lesson;
+      presenceBtn.hidden = !lesson;
+      dialog.showModal();
+    }
+
+    lessonForm.start.addEventListener("change", () => {
+      const data = loadData();
+      const day = data.days.find((d) => d.id === editing.dayId);
+      fillDurationOptions(data, day, lessonForm.start.value, parseInt(lessonForm.duration.value, 10), editing.lessonId);
+    });
+
+    document.getElementById("cancel-dialog").addEventListener("click", () => dialog.close());
+
+    lessonForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const data = loadData();
+      const day = data.days.find((d) => d.id === editing.dayId);
+      const start = lessonForm.start.value;
+      const duration = parseInt(lessonForm.duration.value, 10);
+      const studentId = lessonForm.studentId.value;
+      if (!start || !duration || !fits(data, day, start, duration, editing.lessonId)) {
+        dialogError.textContent = "Dit tijdslot is niet (meer) vrij.";
+        return;
+      }
+      if (editing.lessonId) {
+        const l = data.lessons.find((x) => x.id === editing.lessonId);
+        Object.assign(l, { start, duration, studentId });
+      } else {
+        data.lessons.push({ id: uid(), dayId: day.id, studentId, start, duration });
+      }
+      saveData(data);
+      dialog.close();
+      render();
+    });
+
+    deleteBtn.addEventListener("click", () => {
+      const data = loadData();
+      data.lessons = data.lessons.filter((l) => l.id !== editing.lessonId);
+      saveData(data);
+      dialog.close();
+      render();
+    });
+
+    presenceBtn.addEventListener("click", () => {
+      const data = loadData();
+      const l = data.lessons.find((x) => x.id === editing.lessonId);
+      const s = l && data.students.find((x) => x.id === l.studentId);
+      if (!s) return;
+      s.presence += 1;
+      saveData(data);
+      dialog.close();
+      render();
+    });
+
+    function render() {
+      const data = loadData();
+      renderDays(data);
+      renderGrid(data);
+    }
+
+    // Bijwerken als de andere pagina (in een ander tabblad) iets wijzigt
+    window.addEventListener("storage", (e) => { if (e.key === STORAGE_KEY) render(); });
+
+    render();
+  </script>
+</body>
+</html>
