@@ -18,58 +18,20 @@
   </header>
 
   <main>
-    <h1>Leerlingen</h1>
+    <div class="page-head">
+      <h1>Leerlingen <span class="count" id="student-count"></span></h1>
+      <button type="button" id="add-btn">+ Leerling</button>
+    </div>
 
-    <section class="card">
-      <h2 id="form-title">Leerling toevoegen</h2>
-      <form id="student-form" class="inline">
-        <input type="hidden" name="id">
-        <label>Naam
-          <input name="name" required placeholder="Bijv. Sanne de Vries">
-        </label>
-        <label>Telefoonnummer
-          <input name="phone" type="tel" placeholder="06 12345678">
-        </label>
-        <label>Type
-          <select name="type">
-            <option value="weekly">Elke week</option>
-            <option value="biweekly">Elke twee weken</option>
-            <option value="package">Lespakket van x lessen</option>
-          </select>
-        </label>
-        <label id="package-field" hidden>Aantal lessen
-          <input name="packageSize" type="number" min="1" value="10">
-        </label>
-        <label>Presentie
-          <input name="presence" type="number" min="0" value="0">
-        </label>
-        <button type="submit" id="submit-btn">Toevoegen</button>
-        <button type="button" id="cancel-edit" class="secondary" hidden>Annuleren</button>
-      </form>
-    </section>
+    <input type="search" id="search" class="search" placeholder="Zoek leerling…" aria-label="Zoek leerling">
 
-    <section class="card">
-      <h2>Overzicht</h2>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Naam</th>
-              <th class="hide-sm">Telefoon</th>
-              <th>Type</th>
-              <th>Presentie</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="student-rows"></tbody>
-        </table>
-      </div>
-      <p id="no-students" class="empty" hidden>Nog geen leerlingen toegevoegd.</p>
-    </section>
+    <div id="profiles" class="profiles"></div>
+    <p id="no-students" class="empty" hidden>Nog geen leerlingen. Tik op "+ Leerling" om er een toe te voegen.</p>
+    <p id="no-results" class="empty" hidden>Geen leerlingen gevonden.</p>
 
-    <section class="card">
+    <section class="card backup">
       <h2>Back-up</h2>
-      <p class="sub">Gegevens worden in deze browser opgeslagen. Maak af en toe een back-up.</p>
+      <p class="sub">Gegevens worden op dit apparaat opgeslagen. Maak af en toe een back-up.</p>
       <div class="toolbar">
         <button type="button" id="export-btn" class="secondary">Back-up downloaden</button>
         <button type="button" class="secondary" onclick="document.getElementById('import-input').click()">Back-up terugzetten</button>
@@ -78,30 +40,255 @@
     </section>
   </main>
 
+  <!-- Profiel -->
+  <dialog id="profile-dialog" class="profile-dialog">
+    <div class="profile-head">
+      <div class="avatar large" id="p-avatar"></div>
+      <div>
+        <h2 id="p-name"></h2>
+        <span class="badge" id="p-type"></span>
+      </div>
+      <button type="button" class="close" id="p-close" aria-label="Sluiten">×</button>
+    </div>
+
+    <div class="profile-section">
+      <div class="label">Telefoon</div>
+      <div id="p-phone"></div>
+    </div>
+
+    <div class="profile-section">
+      <div class="label">Presentie</div>
+      <div class="presence big">
+        <button type="button" class="secondary icon" id="p-dec" aria-label="Presentie min 1">−</button>
+        <input type="number" min="0" id="p-presence" aria-label="Presentie">
+        <button type="button" class="secondary icon" id="p-inc" aria-label="Presentie plus 1">+</button>
+      </div>
+      <div id="p-package"></div>
+    </div>
+
+    <div class="profile-section">
+      <div class="label">Lessen</div>
+      <div id="p-lessons"></div>
+    </div>
+
+    <div class="buttons">
+      <button type="button" class="danger left" id="p-delete">Verwijderen</button>
+      <button type="button" class="secondary" id="p-edit">Bewerken</button>
+    </div>
+  </dialog>
+
+  <!-- Toevoegen / bewerken -->
+  <dialog id="form-dialog">
+    <form id="student-form">
+      <h2 id="form-title">Leerling toevoegen</h2>
+      <input type="hidden" name="id">
+      <label>Naam
+        <input name="name" required placeholder="Bijv. Sanne de Vries">
+      </label>
+      <label>Telefoonnummer
+        <input name="phone" type="tel" placeholder="06 12345678">
+      </label>
+      <label>Type
+        <select name="type">
+          <option value="weekly">Elke week</option>
+          <option value="biweekly">Elke twee weken</option>
+          <option value="package">Lespakket van x lessen</option>
+        </select>
+      </label>
+      <label id="package-field" hidden>Aantal lessen
+        <input name="packageSize" type="number" min="1" value="10">
+      </label>
+      <label>Presentie
+        <input name="presence" type="number" min="0" value="0">
+      </label>
+      <div class="buttons">
+        <button type="button" class="secondary" id="cancel-form">Annuleren</button>
+        <button type="submit" id="submit-btn">Toevoegen</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="store.js"></script>
   <script>
+    const profilesEl = document.getElementById("profiles");
+    const searchEl = document.getElementById("search");
+    const profileDialog = document.getElementById("profile-dialog");
+    const formDialog = document.getElementById("form-dialog");
     const form = document.getElementById("student-form");
     const packageField = document.getElementById("package-field");
-    const rows = document.getElementById("student-rows");
-    const noStudents = document.getElementById("no-students");
-    const submitBtn = document.getElementById("submit-btn");
-    const cancelBtn = document.getElementById("cancel-edit");
-    const formTitle = document.getElementById("form-title");
+    let openId = null;
 
+    function initials(name) {
+      const parts = name.trim().split(/\s+/);
+      const first = parts[0] ? parts[0][0] : "";
+      const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
+      return (first + last).toUpperCase();
+    }
+
+    function packageInfo(s) {
+      if (s.type !== "package") return "";
+      const left = Math.max(0, s.packageSize - s.presence);
+      return `${left} van ${s.packageSize} over`;
+    }
+
+    // ---- Lijst met profielblokjes ----
+    function render() {
+      const data = loadData();
+      const q = searchEl.value.trim().toLowerCase();
+      const all = [...data.students].sort((a, b) => a.name.localeCompare(b.name, "nl"));
+      const students = all.filter((s) => !q || s.name.toLowerCase().includes(q) || (s.phone || "").replace(/\s/g, "").includes(q.replace(/\s/g, "")));
+
+      document.getElementById("student-count").textContent = all.length ? all.length : "";
+      document.getElementById("no-students").hidden = all.length > 0;
+      document.getElementById("no-results").hidden = !(all.length && !students.length);
+      searchEl.hidden = all.length < 2;
+
+      profilesEl.innerHTML = students.map((s) => {
+        const sub = s.type === "package" ? packageInfo(s) : `Presentie ${s.presence}`;
+        const done = s.type === "package" && s.presence >= s.packageSize;
+        return `
+          <button type="button" class="profile ${s.type}" data-id="${s.id}">
+            <div class="avatar ${s.type}">${escapeHtml(initials(s.name))}</div>
+            <div class="profile-name">${escapeHtml(s.name)}</div>
+            <span class="badge ${s.type}">${escapeHtml(TYPES[s.type])}</span>
+            <div class="profile-sub ${done ? "warn" : ""}">${escapeHtml(done ? "Pakket op" : sub)}</div>
+          </button>`;
+      }).join("");
+
+      if (openId && profileDialog.open) renderProfile();
+    }
+
+    searchEl.addEventListener("input", render);
+    profilesEl.addEventListener("click", (e) => {
+      const card = e.target.closest(".profile");
+      if (!card) return;
+      openId = card.dataset.id;
+      renderProfile();
+      profileDialog.showModal();
+    });
+
+    // ---- Profiel ----
+    function whatsappNumber(phone) {
+      let n = phone.replace(/[^\d+]/g, "");
+      if (n.startsWith("+")) return n.slice(1);
+      if (n.startsWith("00")) return n.slice(2);
+      if (n.startsWith("0")) return "31" + n.slice(1);
+      return n;
+    }
+
+    function renderProfile() {
+      const data = loadData();
+      const s = data.students.find((x) => x.id === openId);
+      if (!s) { profileDialog.close(); return; }
+
+      const avatar = document.getElementById("p-avatar");
+      avatar.className = `avatar large ${s.type}`;
+      avatar.textContent = initials(s.name);
+      document.getElementById("p-name").textContent = s.name;
+      const badge = document.getElementById("p-type");
+      badge.className = `badge ${s.type}`;
+      badge.textContent = typeLabel(s);
+
+      document.getElementById("p-phone").innerHTML = s.phone
+        ? `<div class="phone-row"><span>${escapeHtml(s.phone)}</span>
+             <a class="pill" href="tel:${escapeHtml(s.phone.replace(/[^\d+]/g, ""))}">Bellen</a>
+             <a class="pill" href="https://wa.me/${escapeHtml(whatsappNumber(s.phone))}" target="_blank" rel="noopener">WhatsApp</a></div>`
+        : `<span class="sub">Geen telefoonnummer</span>`;
+
+      document.getElementById("p-presence").value = s.presence;
+      const pkg = document.getElementById("p-package");
+      if (s.type === "package") {
+        const pct = Math.min(100, Math.round((s.presence / s.packageSize) * 100));
+        pkg.innerHTML = `<div class="progress"><div style="width:${pct}%"></div></div>
+          <div class="sub">${s.presence} van ${s.packageSize} lessen gehad · ${escapeHtml(packageInfo(s))}</div>`;
+      } else pkg.innerHTML = "";
+
+      // Ingeplande lessen
+      const days = Object.fromEntries(data.days.map((d) => [d.id, d]));
+      const today = todayIso();
+      const lessons = data.lessons
+        .filter((l) => l.studentId === s.id && days[l.dayId])
+        .map((l) => ({ ...l, date: days[l.dayId].date }))
+        .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+      const upcoming = lessons.filter((l) => l.date >= today);
+      const past = lessons.length - upcoming.length;
+      const el = document.getElementById("p-lessons");
+      if (!lessons.length) {
+        el.innerHTML = `<span class="sub">Nog niet ingepland</span>`;
+      } else {
+        el.innerHTML = (upcoming.length
+          ? `<ul class="lesson-list">${upcoming.slice(0, 5).map((l) =>
+              `<li><a href="index.html#${l.dayId}">${escapeHtml(formatDateShort(l.date))}</a>
+                <span class="sub">${l.start}–${minToTime(timeToMin(l.start) + l.duration)}</span></li>`).join("")}</ul>
+             ${upcoming.length > 5 ? `<div class="sub">en nog ${upcoming.length - 5} meer</div>` : ""}`
+          : `<span class="sub">Geen komende lessen</span>`)
+          + (past ? `<div class="sub" style="margin-top:6px">${past} les${past === 1 ? "" : "sen"} in het verleden</div>` : "");
+      }
+    }
+
+    function setPresence(value) {
+      const data = loadData();
+      const s = data.students.find((x) => x.id === openId);
+      if (!s) return;
+      s.presence = Math.max(0, value);
+      saveData(data);
+      render();
+    }
+
+    document.getElementById("p-inc").addEventListener("click", () => setPresence(+document.getElementById("p-presence").value + 1));
+    document.getElementById("p-dec").addEventListener("click", () => setPresence(+document.getElementById("p-presence").value - 1));
+    document.getElementById("p-presence").addEventListener("change", (e) => setPresence(parseInt(e.target.value, 10) || 0));
+    document.getElementById("p-close").addEventListener("click", () => profileDialog.close());
+    // Tik buiten het venster om te sluiten
+    for (const dlg of [profileDialog, formDialog]) {
+      dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+    }
+
+    document.getElementById("p-edit").addEventListener("click", () => {
+      profileDialog.close();
+      openForm(loadData().students.find((x) => x.id === openId));
+    });
+
+    document.getElementById("p-delete").addEventListener("click", () => {
+      const data = loadData();
+      const s = data.students.find((x) => x.id === openId);
+      if (!s) return;
+      const count = data.lessons.filter((l) => l.studentId === s.id).length;
+      const extra = count ? `\nDe leerling staat ${count}x ingepland; die lessen worden ook verwijderd.` : "";
+      if (!confirm(`${s.name} verwijderen?${extra}`)) return;
+      data.students = data.students.filter((x) => x.id !== s.id);
+      data.lessons = data.lessons.filter((l) => l.studentId !== s.id);
+      saveData(data);
+      profileDialog.close();
+      openId = null;
+      render();
+    });
+
+    // ---- Formulier ----
     function togglePackageField() {
       packageField.hidden = form.type.value !== "package";
     }
     form.type.addEventListener("change", togglePackageField);
 
-    function resetForm() {
+    function openForm(student) {
       form.reset();
-      form.id.value = "";
-      submitBtn.textContent = "Toevoegen";
-      formTitle.textContent = "Leerling toevoegen";
-      cancelBtn.hidden = true;
+      form.id.value = student ? student.id : "";
+      if (student) {
+        form.name.value = student.name;
+        form.phone.value = student.phone;
+        form.type.value = student.type;
+        form.packageSize.value = student.packageSize || 10;
+        form.presence.value = student.presence;
+      }
+      document.getElementById("form-title").textContent = student ? "Leerling bewerken" : "Leerling toevoegen";
+      document.getElementById("submit-btn").textContent = student ? "Opslaan" : "Toevoegen";
       togglePackageField();
+      formDialog.showModal();
+      form.name.focus();
     }
-    cancelBtn.addEventListener("click", resetForm);
+
+    document.getElementById("add-btn").addEventListener("click", () => openForm(null));
+    document.getElementById("cancel-form").addEventListener("click", () => formDialog.close());
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -119,100 +306,14 @@
       if (idx >= 0) data.students[idx] = student;
       else data.students.push(student);
       saveData(data);
-      resetForm();
-      render();
+      formDialog.close();
+      // Na bewerken het profiel weer tonen
+      if (idx >= 0) { openId = student.id; render(); renderProfile(); profileDialog.showModal(); }
+      else render();
     });
 
-    function setPresence(id, value) {
-      const data = loadData();
-      const s = data.students.find((x) => x.id === id);
-      if (!s) return;
-      s.presence = Math.max(0, value);
-      saveData(data);
-      render();
-    }
-
-    function editStudent(id) {
-      const s = loadData().students.find((x) => x.id === id);
-      if (!s) return;
-      form.id.value = s.id;
-      form.name.value = s.name;
-      form.phone.value = s.phone;
-      form.type.value = s.type;
-      form.packageSize.value = s.packageSize || 10;
-      form.presence.value = s.presence;
-      togglePackageField();
-      submitBtn.textContent = "Opslaan";
-      formTitle.textContent = "Leerling bewerken";
-      cancelBtn.hidden = false;
-      form.scrollIntoView({ behavior: "smooth", block: "center" });
-      form.name.focus();
-    }
-
-    function deleteStudent(id) {
-      const data = loadData();
-      const s = data.students.find((x) => x.id === id);
-      if (!s) return;
-      const count = data.lessons.filter((l) => l.studentId === id).length;
-      const extra = count ? `\nDe leerling staat ${count}x ingepland; die lessen worden ook verwijderd.` : "";
-      if (!confirm(`${s.name} verwijderen?${extra}`)) return;
-      data.students = data.students.filter((x) => x.id !== id);
-      data.lessons = data.lessons.filter((l) => l.studentId !== id);
-      saveData(data);
-      if (form.id.value === id) resetForm();
-      render();
-    }
-
-    function render() {
-      const data = loadData();
-      const students = [...data.students].sort((a, b) => a.name.localeCompare(b.name, "nl"));
-      noStudents.hidden = students.length > 0;
-      rows.innerHTML = students.map((s) => {
-        const planned = data.lessons.filter((l) => l.studentId === s.id).length;
-        const pkg = s.type === "package"
-          ? `<div class="sub">${Math.max(0, s.packageSize - s.presence)} van ${s.packageSize} over</div>` : "";
-        return `
-          <tr>
-            <td><strong>${escapeHtml(s.name)}</strong><div class="sub">${planned}x ingepland</div></td>
-            <td class="hide-sm">${s.phone ? `<a href="tel:${escapeHtml(s.phone.replace(/\s/g, ""))}">${escapeHtml(s.phone)}</a>` : "<span class='sub'>—</span>"}</td>
-            <td><span class="badge ${s.type}">${escapeHtml(typeLabel(s))}</span>${pkg}</td>
-            <td>
-              <div class="presence">
-                <button class="secondary icon" data-act="dec" data-id="${s.id}" aria-label="Presentie min 1">−</button>
-                <input type="number" min="0" value="${s.presence}" data-act="set" data-id="${s.id}" aria-label="Presentie">
-                <button class="secondary icon" data-act="inc" data-id="${s.id}" aria-label="Presentie plus 1">+</button>
-              </div>
-            </td>
-            <td>
-              <div class="actions">
-                <button class="secondary small" data-act="edit" data-id="${s.id}">Bewerken</button>
-                <button class="danger small" data-act="delete" data-id="${s.id}">Verwijderen</button>
-              </div>
-            </td>
-          </tr>`;
-      }).join("");
-    }
-
-    rows.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-act]");
-      if (!btn) return;
-      const id = btn.dataset.id;
-      const s = loadData().students.find((x) => x.id === id);
-      switch (btn.dataset.act) {
-        case "inc": setPresence(id, s.presence + 1); break;
-        case "dec": setPresence(id, s.presence - 1); break;
-        case "edit": editStudent(id); break;
-        case "delete": deleteStudent(id); break;
-      }
-    });
-
-    rows.addEventListener("change", (e) => {
-      const input = e.target.closest("input[data-act='set']");
-      if (input) setPresence(input.dataset.id, parseInt(input.value, 10) || 0);
-    });
-
+    window.addEventListener("storage", (e) => { if (e.key === STORAGE_KEY) render(); });
     setupBackupButtons(render);
-    togglePackageField();
     render();
   </script>
 </body>

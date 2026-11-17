@@ -196,3 +196,70 @@ dialog .buttons .left { margin-right: auto; }
 [hidden] { display: none !important; }
 .error:empty { display: none; }
 .error { margin: 8px 0 0; }
+
+/* ---- Leerlingen: profielblokjes ---- */
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.page-head h1 { margin: 8px 0 16px; }
+.count { color: var(--muted); font-weight: 500; font-size: 1rem; margin-left: 4px; }
+.search { width: 100%; margin-bottom: 16px; }
+
+.profiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.profile {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-top: 4px solid var(--weekly);
+  border-radius: 14px;
+  padding: 16px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  font-weight: 400;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.profile.biweekly { border-top-color: var(--biweekly); }
+.profile.package { border-top-color: var(--package); }
+.profile:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08); }
+.profile:active { transform: scale(0.97); }
+.profile-name { font-weight: 600; word-break: break-word; }
+.profile-sub { font-size: 0.8rem; color: var(--muted); }
+.profile-sub.warn { color: var(--danger); font-weight: 600; }
+
+.avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.1rem;
+  background: var(--accent-soft); color: var(--weekly);
+  flex-shrink: 0;
+}
+.avatar.biweekly { background: #f1e9fb; color: var(--biweekly); }
+.avatar.package { background: #fbefe2; color: var(--package); }
+.avatar.large { width: 60px; height: 60px; font-size: 1.3rem; }
+
+/* Profielvenster */
+.profile-dialog { padding: 0; }
+.profile-head { display: flex; align-items: center; gap: 14px; padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+.profile-head h2 { margin: 0 0 4px; }
+.profile-head .close { margin-left: auto; align-self: flex-start; background: none; color: var(--muted); font-size: 1.4rem; padding: 0 6px; }
+.profile-section { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.profile-section .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+.profile-dialog .buttons { padding: 14px 20px 18px; display: flex; gap: 8px; }
+.phone-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.phone-row span { margin-right: auto; font-weight: 500; }
+.pill { text-decoration: none; padding: 6px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 0.85rem; font-weight: 600; }
+.presence.big input { width: 80px; font-size: 1.1rem; font-weight: 600; }
+.presence.big button { min-width: 44px; font-size: 1.1rem; }
+.progress { height: 8px; border-radius: 999px; background: #f0f1f4; overflow: hidden; margin: 12px 0 6px; }
+.progress div { height: 100%; background: var(--package); border-radius: 999px; }
+.lesson-list { list-style: none; margin: 0; padding: 0; }
+.lesson-list li { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.lesson-list li:last-child { border-bottom: none; }
+.lesson-list a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.backup { margin-top: 8px; }
