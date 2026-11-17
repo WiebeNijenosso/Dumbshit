@@ -1,0 +1,63 @@
+name: Android-app bouwen
+
+on:
+  push:
+    branches: [main, claude/rooster-app-leerlingen-io6yeu]
+    paths:
+      - "rooster-app/**"
+      - "rooster-android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rooster-android
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rooster-android/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Web-bestanden naar Android kopiëren
+        run: |
+          npm ci
+          npx cap sync android
+
+      - name: APK bouwen
+        working-directory: rooster-android/android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk ../Lesrooster.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Lesrooster-apk
+          path: rooster-android/Lesrooster.apk
+
+      - name: Publiceren als download
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: lesrooster-latest
+          name: Lesrooster Android-app
+          body: |
+            Download **Lesrooster.apk** hieronder en open het bestand op je Android-telefoon.
+            Versie ${{ github.run_number }} (commit ${{ github.sha }}).
+          files: rooster-android/Lesrooster.apk
+          make_latest: true

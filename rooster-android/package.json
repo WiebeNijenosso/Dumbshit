@@ -1,0 +1,18 @@
+{
+  "name": "lesrooster-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android-app (Capacitor) voor de rooster-app",
+  "scripts": {
+    "sync": "cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "7.6.10",
+    "@capacitor/core": "7.6.10",
+    "@capacitor/filesystem": "7.1.9",
+    "@capacitor/share": "7.0.4"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "7.6.10"
+  }
+}

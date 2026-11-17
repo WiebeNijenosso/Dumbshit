@@ -72,11 +72,28 @@ function formatDateShort(iso) {
 }
 
 // Back-up: exporteren/importeren als JSON-bestand
-function exportData() {
-  const blob = new Blob([JSON.stringify(loadData(), null, 2)], { type: "application/json" });
+async function exportData() {
+  const json = JSON.stringify(loadData(), null, 2);
+  const fileName = `rooster-backup-${todayIso()}.json`;
+  const plugins = window.Capacitor && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins;
+
+  // In de Android-app: bestand opslaan en via het deelmenu versturen (WhatsApp, Drive, mail, ...)
+  if (plugins && plugins.Filesystem && plugins.Share) {
+    try {
+      const { uri } = await plugins.Filesystem.writeFile({
+        path: fileName, data: json, directory: "CACHE", encoding: "utf8",
+      });
+      await plugins.Share.share({ title: "Rooster back-up", files: [uri] });
+    } catch (e) {
+      if (!/cancel/i.test(e && e.message)) alert("Back-up maken mislukt: " + (e && e.message));
+    }
+    return;
+  }
+
+  const blob = new Blob([json], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `rooster-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = fileName;
   a.click();
   URL.revokeObjectURL(a.href);
 }

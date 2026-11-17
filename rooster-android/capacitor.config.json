@@ -1,0 +1,8 @@
+{
+  "appId": "nl.lesrooster.app",
+  "appName": "Lesrooster",
+  "webDir": "../rooster-app",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "force"
+  }
+}
